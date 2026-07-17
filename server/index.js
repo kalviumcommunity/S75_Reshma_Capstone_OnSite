@@ -4,8 +4,6 @@ const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const multer = require('multer');
-const path = require('path');
 const pool = require('./db');
 const app = express();
 const port = process.env.PORT || 5000;
@@ -13,18 +11,6 @@ const port = process.env.PORT || 5000;
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/');
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname));
-  },
-});
-const upload = multer({ storage });
 
 // Test route
 app.get('/', (req, res) => {
@@ -180,13 +166,6 @@ app.get('/api/projects/:id/updates', authenticateToken, async (req, res) => {
   }
 });
 
-app.post('/api/upload', authenticateToken, upload.single('image'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'No file uploaded' });
-  }
-  res.json({ imageUrl: `http://localhost:${port}/uploads/${req.file.filename}` });
-});
-
 app.post('/api/projects/:id/updates', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -196,6 +175,57 @@ app.post('/api/projects/:id/updates', authenticateToken, async (req, res) => {
       [id, req.user.userId, title, content, imageUrl]
     );
     res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Project milestones routes
+app.get('/api/projects/:id/milestones', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query('SELECT * FROM project_milestones WHERE project_id = $1 ORDER BY due_date ASC', [id]);
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/api/projects/:id/milestones', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'engineer') {
+      return res.status(403).json({ error: 'Only engineers can create milestones' });
+    }
+    const { id } = req.params;
+    const { title, description, dueDate } = req.body;
+    const result = await pool.query(
+      'INSERT INTO project_milestones (project_id, title, description, due_date) VALUES ($1, $2, $3, $4) RETURNING *',
+      [id, title, description, dueDate]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.put('/api/milestones/:id', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'engineer') {
+      return res.status(403).json({ error: 'Only engineers can update milestones' });
+    }
+    const { id } = req.params;
+    const { completed } = req.body;
+    const result = await pool.query(
+      'UPDATE project_milestones SET completed = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
+      [completed, id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Milestone not found' });
+    }
+    res.json(result.rows[0]);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });

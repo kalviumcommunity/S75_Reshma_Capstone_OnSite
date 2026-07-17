@@ -10,19 +10,27 @@ function ProjectDetails() {
   const { user, token } = useAuth();
   const [project, setProject] = useState(null);
   const [updates, setUpdates] = useState([]);
+  const [milestones, setMilestones] = useState([]);
   const [newUpdate, setNewUpdate] = useState({ title: '', content: '' });
   const [selectedFile, setSelectedFile] = useState(null);
   const [imageUrl, setImageUrl] = useState('');
+  const [newMilestone, setNewMilestone] = useState({ title: '', description: '', dueDate: '' });
+  const [showAddMilestone, setShowAddMilestone] = useState(false);
 
   useEffect(() => {
-    const fetchProjectAndUpdates = async () => {
-      const updatesRes = await fetch(`http://localhost:5000/api/projects/${id}/updates`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const updatesData = await updatesRes.json();
-      setUpdates(updatesData);
+    const fetchProjectData = async () => {
+      const [updatesRes, milestonesRes] = await Promise.all([
+        fetch(`http://localhost:5000/api/projects/${id}/updates`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch(`http://localhost:5000/api/projects/${id}/milestones`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      ]);
+      setUpdates(await updatesRes.json());
+      setMilestones(await milestonesRes.json());
     };
-    if (token) fetchProjectAndUpdates();
+    if (token) fetchProjectData();
   }, [id, token]);
 
   const handleFileChange = async (e) => {
@@ -59,6 +67,38 @@ function ProjectDetails() {
     setSelectedFile(null);
   };
 
+  const handleAddMilestone = async (e) => {
+    e.preventDefault();
+    const res = await fetch(`http://localhost:5000/api/projects/${id}/milestones`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(newMilestone),
+    });
+    const data = await res.json();
+    setMilestones([...milestones, data]);
+    setNewMilestone({ title: '', description: '', dueDate: '' });
+    setShowAddMilestone(false);
+  };
+
+  const handleToggleMilestone = async (milestoneId, completed) => {
+    await fetch(`http://localhost:5000/api/milestones/${milestoneId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ completed: !completed }),
+    });
+    setMilestones(
+      milestones.map((m) =>
+        m.id === milestoneId ? { ...m, completed: !completed } : m
+      )
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
@@ -72,6 +112,97 @@ function ProjectDetails() {
               ← Back
             </button>
             <h1 className="text-3xl font-bold text-gray-900">Project Details</h1>
+          </div>
+
+          <div className="mb-8">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-semibold text-gray-900">Milestones</h2>
+              {user.role === 'engineer' && (
+                <button
+                  onClick={() => setShowAddMilestone(!showAddMilestone)}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+                >
+                  Add Milestone
+                </button>
+              )}
+            </div>
+
+            {showAddMilestone && (
+              <form onSubmit={handleAddMilestone} className="mb-6 bg-white p-6 rounded-lg shadow">
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Title</label>
+                    <input
+                      type="text"
+                      value={newMilestone.title}
+                      onChange={(e) => setNewMilestone({ ...newMilestone, title: e.target.value })}
+                      className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Description</label>
+                    <textarea
+                      value={newMilestone.description}
+                      onChange={(e) => setNewMilestone({ ...newMilestone, description: e.target.value })}
+                      className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      rows={3}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Due Date</label>
+                    <input
+                      type="date"
+                      value={newMilestone.dueDate}
+                      onChange={(e) => setNewMilestone({ ...newMilestone, dueDate: e.target.value })}
+                      className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      required
+                    />
+                  </div>
+                  <div className="flex space-x-2">
+                    <button
+                      type="submit"
+                      className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                    >
+                      Add Milestone
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddMilestone(false)}
+                      className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </form>
+            )}
+
+            <div className="grid md:grid-cols-2 gap-4">
+              {milestones.map((milestone) => (
+                <div key={milestone.id} className="bg-white p-6 rounded-lg shadow">
+                  <div className="flex items-center mb-2">
+                    <input
+                      type="checkbox"
+                      checked={milestone.completed}
+                      onChange={() => handleToggleMilestone(milestone.id, milestone.completed)}
+                      className="mr-3 h-5 w-5 text-indigo-600"
+                      disabled={user.role !== 'engineer'}
+                    />
+                    <h3 className="text-xl font-semibold text-gray-900">{milestone.title}</h3>
+                  </div>
+                  {milestone.description && (
+                    <p className="text-gray-600 mb-2">{milestone.description}</p>
+                  )}
+                  <p className="text-sm text-gray-500">
+                    Due: {new Date(milestone.due_date).toLocaleDateString()}
+                  </p>
+                </div>
+              ))}
+              {milestones.length === 0 && (
+                <p className="text-center text-gray-500 col-span-2">No milestones yet.</p>
+              )}
+            </div>
           </div>
 
           {user.role === 'engineer' && (
@@ -143,3 +274,4 @@ function ProjectDetails() {
 }
 
 export default ProjectDetails;
+
