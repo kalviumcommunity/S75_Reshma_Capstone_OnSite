@@ -1,0 +1,25 @@
+
+meta {
+  name: Create Project
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/projects
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "name": "Test Project",
+    "description": "A test construction project",
+    "clientIds": []
+  }
+}
+
