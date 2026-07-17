@@ -11,6 +11,8 @@ function ProjectDetails() {
   const [project, setProject] = useState(null);
   const [updates, setUpdates] = useState([]);
   const [newUpdate, setNewUpdate] = useState({ title: '', content: '' });
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [imageUrl, setImageUrl] = useState('');
 
   useEffect(() => {
     const fetchProjectAndUpdates = async () => {
@@ -23,6 +25,23 @@ function ProjectDetails() {
     if (token) fetchProjectAndUpdates();
   }, [id, token]);
 
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const formData = new FormData();
+      formData.append('image', file);
+      const res = await fetch('http://localhost:5000/api/upload', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+      const data = await res.json();
+      setImageUrl(data.imageUrl);
+    }
+  };
+
   const handleAddUpdate = async (e) => {
     e.preventDefault();
     const res = await fetch(`http://localhost:5000/api/projects/${id}/updates`, {
@@ -31,11 +50,13 @@ function ProjectDetails() {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify(newUpdate),
+      body: JSON.stringify({ ...newUpdate, imageUrl }),
     });
     const data = await res.json();
     setUpdates([data, ...updates]);
     setNewUpdate({ title: '', content: '' });
+    setImageUrl('');
+    setSelectedFile(null);
   };
 
   return (
@@ -75,6 +96,16 @@ function ProjectDetails() {
                     className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     rows={4}
                   />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Image</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  {imageUrl && <img src={imageUrl} alt="Preview" className="mt-2 max-h-40 rounded" />}
                 </div>
                 <button
                   type="submit"
