@@ -1,18 +1,27 @@
 
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
+import { useAuth } from '../contexts/AuthContext';
 
 function Signup() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('client');
+  const [error, setError] = useState('');
+  const { signup } = useAuth();
+  const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // TODO: Implement signup logic
-    console.log('Signup:', { name, email, password, role });
+    setError('');
+    const data = await signup(name, email, password, role);
+    if (data.error) {
+      setError(data.error);
+    } else {
+      navigate('/dashboard');
+    }
   };
 
   return (
@@ -21,7 +30,8 @@ function Signup() {
       <main className="py-12">
         <div className="max-w-md mx-auto px-4 sm:px-6 lg:px-8">
           <div className="bg-white shadow-lg rounded-lg p-8">
-            <h2 className="text-2xl font-bold text-center text-gray-900 mb-8">Sign Up for OnSite</h2>
+            <h2 className="text-2xl font-bold text-center text-gray-900 mb-8">Sign up for OnSite</h2>
+            {error && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">{error}</div>}
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
@@ -82,7 +92,7 @@ function Signup() {
                 type="submit"
                 className="w-full py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition"
               >
-                Sign Up
+                Sign up
               </button>
             </form>
             <p className="text-center text-gray-600 mt-4">
